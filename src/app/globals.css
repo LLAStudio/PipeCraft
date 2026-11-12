@@ -1,0 +1,363 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   PipeCraft Global Styles
+   Dark mode forcé — palette "PipeCraft Dark"
+   ========================================================================== */
+
+:root {
+  /* Couleurs principales */
+  --color-bg-primary: #0B0D08;          /* Zinc 950 */
+  --color-bg-secondary: #131610;        /* Panneaux latéraux */
+  --color-bg-canvas: #0D0F0A;           /* Canevas React Flow */
+  --color-border: #2A3022;              /* Bordures Zinc 800 */
+  --color-border-light: #48513B;        /* Zinc 700 */
+
+  /* Accent primary */
+  --color-primary: #A3E635;             /* Indigo 500 */
+  --color-primary-hover: #BEF264;       /* Indigo 400 */
+  --color-primary-muted: rgba(99, 102, 241, 0.15);
+
+  /* Node colors */
+  --color-trigger: #FACC15;             /* Violet */
+  --color-job: #A3E635;                 /* Bleu */
+  --color-step-action: #10B981;         /* Émeraude */
+  --color-step-script: #F59E0B;         /* Ambre */
+  --color-reusable: #94A3B8;            /* Cyan */
+
+  /* Sémantique */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #A3E635;
+
+  /* Typographie par défaut */
+  --font-sans: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+
+  /* Réactif */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Ombres */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-panel: 0 4px 12px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-glow-primary: none;
+  --shadow-glow-trigger: none;
+  --shadow-glow-job: none;
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: #EDF1E6;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Définitions de styles pour dark mode forcée */
+@media (prefers-color-scheme: light) {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    color-scheme: dark;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Sélection de texte — style PipeCraft
+   -------------------------------------------------------------------------- */
+
+::selection {
+  background-color: rgba(163, 230, 53, 0.28);
+  color: #F4F7EE;
+}
+
+::-moz-selection {
+  background-color: rgba(163, 230, 53, 0.28);
+  color: #F4F7EE;
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbar personnalisée
+   -------------------------------------------------------------------------- */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-light);
+}
+
+::-webkit-scrollbar-thumb:focus {
+  background: rgba(163, 230, 53, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   Focus visible — accessibilité
+   -------------------------------------------------------------------------- */
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Typographie
+   -------------------------------------------------------------------------- */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+code, pre, .font-mono {
+  font-family: var(--font-mono);
+}
+
+/* --------------------------------------------------------------------------
+   Tailwind utilities personnalisées
+   -------------------------------------------------------------------------- */
+
+/* Couleurs personnalisées */
+@layer base {
+  .bg-pipecraft-primary { background-color: var(--color-primary); }
+  .bg-pipecraft-primary-muted { background-color: var(--color-primary-muted); }
+  .bg-pipecraft-trigger { background-color: var(--color-trigger); }
+  .bg-pipecraft-job { background-color: var(--color-job); }
+  .bg-pipecraft-step-action { background-color: var(--color-step-action); }
+  .bg-pipecraft-step-script { background-color: var(--color-step-script); }
+  .bg-pipecraft-reusable { background-color: var(--color-reusable); }
+  .text-pipecraft-primary { color: var(--color-primary); }
+  .text-pipecraft-primary-muted { color: rgba(190, 242, 100, 0.75); }
+  .text-pipecraft-trigger { color: var(--color-trigger); }
+  .text-pipecraft-job { color: var(--color-job); }
+  .text-pipecraft-step-action { color: var(--color-step-action); }
+  .text-pipecraft-step-script { color: var(--color-step-script); }
+  .text-pipecraft-reusable { color: var(--color-reusable); }
+  .border-pipecraft-primary { border-color: var(--color-primary); }
+  .border-pipecraft-border { border-color: var(--color-border); }
+  .bg-pipecraft-bg-primary { background-color: var(--color-bg-primary); }
+  .bg-pipecraft-bg-secondary { background-color: var(--color-bg-secondary); }
+  .bg-pipecraft-bg-canvas { background-color: var(--color-bg-canvas); }
+  .border-pipecraft-border-light { border-color: var(--color-border-light); }
+}
+
+/* --------------------------------------------------------------------------
+   React Flow — surcharges CSS pour le canevas sombre
+   -------------------------------------------------------------------------- */
+
+@layer components {
+  .react-flow__background {
+    background-color: var(--color-bg-canvas) !important;
+  }
+
+  .react-flow__background pattern circle {
+    fill: #2A3022 !important;
+  }
+
+  .react-flow__minimap {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-md) !important;
+    overflow: hidden !important;
+  }
+
+  .react-flow__minimap-mask {
+    fill: rgba(13, 15, 10, 0.7) !important;
+  }
+
+  .react-flow__node {
+    font-family: var(--font-sans) !important;
+  }
+
+  .react-flow__edge-path {
+    stroke-width: 2px !important;
+  }
+
+  .react-flow__handle {
+    border: 2px solid var(--color-bg-canvas) !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+  }
+
+  .react-flow__handle:hover {
+    transform: scale(1.25) !important;
+  }
+
+  .react-flow__connection-line {
+    stroke: var(--color-primary) !important;
+    stroke-width: 2px !important;
+    stroke-dasharray: 4 2;
+  }
+
+  .react-flow__panel {
+    background: transparent !important;
+  }
+
+  /* Contrôles React Flow */
+  .react-flow__controls {
+    background: var(--color-bg-secondary) !important;
+    border: 1px solid var(--color-border) !important;
+    border-radius: var(--radius-lg) !important;
+    box-shadow: var(--shadow-panel) !important;
+    overflow: hidden !important;
+  }
+
+  .react-flow__controls-button {
+    background: transparent !important;
+    border: none !important;
+    color: #ACB5A2 !important;
+    padding: 6px 8px !important;
+    transition: all 0.15s ease !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+  .react-flow__controls-button:hover {
+    background: var(--color-border) !important;
+    color: #FFFFFF !important;
+  }
+
+  .react-flow__controls-button svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  /* Grille de fond du canevas */
+  .react-flow__background pattern circle {
+    fill: #2A3022 !important;
+    opacity: 0.5 !important;
+  }
+
+  /* Labels d'arêtes */
+  .react-flow__edge-textbg {
+    fill: rgba(19, 22, 16, 0.92) !important;
+    stroke: #2A3022 !important;
+  }
+
+  .react-flow__edge-text {
+    fill: #ACB5A2 !important;
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Classes utilitaires supplémentaires
+   -------------------------------------------------------------------------- */
+
+@layer utilities {
+  /* Troncature propre */
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Scrollbar hide/show */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    -ms-overflow-style: scrollbar;
+  }
+
+  /* Opaque sticky surfaces */
+  .glass {
+    background: #131610;
+  }
+
+  .glass-strong {
+    background: #0B0D08;
+  }
+
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: var(--shadow-glow-primary);
+  }
+
+  .glow-trigger {
+    box-shadow: var(--shadow-glow-trigger);
+  }
+
+  .glow-job {
+    box-shadow: var(--shadow-glow-job);
+  }
+
+  /* Animations */
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  .animate-pulse-soft {
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Mode impression (si export PDF)
+   -------------------------------------------------------------------------- */
+
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

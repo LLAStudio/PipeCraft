@@ -1,0 +1,92 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows", "darwin", "darwin-arm64", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String            @id @default(cuid())
+  name          String?
+  email         String?           @unique
+  emailVerified DateTime?
+  image         String?
+  githubLogin   String?           @unique
+  accounts      Account[]
+  sessions      Session[]
+  projects      WorkflowProject[]
+  templates     PublicTemplate[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model Account {
+  id                        String  @id @default(cuid())
+  userId                    String
+  type                      String
+  provider                  String
+  providerAccountId         String
+  refresh_token             String? @db.Text
+  access_token              String? @db.Text
+  access_token_iv           String?
+  access_token_tag          String?
+  expires_at                Int?
+  token_type                String?
+  scope                     String?
+  id_token                  String? @db.Text
+  session_state             String?
+  user                      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model WorkflowProject {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String   @default("Nouveau Pipeline CI/CD")
+  description    String?
+  repoOwner      String?
+  repoName       String?
+  repoBranch     String?  @default("main")
+  filePath       String   @default(".github/workflows/ci.yml")
+  graphJson      Json
+  yamlContent    String   @db.Text
+  lastCommitSha  String?
+  isValid        Boolean  @default(true)
+  securityScore  Int      @default(100)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model PublicTemplate {
+  id           String   @id @default(cuid())
+  authorId     String?
+  title        String
+  slug         String   @unique
+  description  String
+  category     String
+  tags         String[]
+  graphJson    Json
+  yamlPreview  String   @db.Text
+  usageCount   Int      @default(0)
+  isOfficial   Boolean  @default(false)
+  author       User?    @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+}

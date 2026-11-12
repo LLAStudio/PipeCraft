@@ -1,0 +1,329 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GitHub Actions Workflow",
+  "description": "Schema for GitHub Actions workflow files (.github/workflows/*.yml)",
+  "type": "object",
+  "required": ["on", "jobs"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the workflow as displayed on GitHub",
+      "default": "GitHub Actions"
+    },
+    "run-name": {
+      "type": "string",
+      "description": "The name of the workflow run as displayed on GitHub"
+    },
+    "on": {
+      "description": "The list of events that trigger the workflow",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "push", "pull_request", "pull_request_target", "release",
+              "schedule", "workflow_dispatch", "workflow_call", "issues",
+              "repository_dispatch", "watch", "fork", "create", "delete",
+              "label", "milestone", "page_build", "project", "project_card",
+              "project_column", "public", "pull_request_review",
+              "pull_request_review_comment", "registry_package", "status",
+              "deployment", "deployment_status", "discussion",
+              "discussion_comment", "merge_queue", "gollum", "issue_comment",
+              "check_run", "check_suite"
+            ]
+          },
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "boolean" },
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } },
+              {
+                "type": "object",
+                "properties": {
+                  "branches": { "$ref": "#/definitions/branches" },
+                  "branches-ignore": { "$ref": "#/definitions/branches" },
+                  "tags": { "$ref": "#/definitions/tags" },
+                  "tags-ignore": { "$ref": "#/definitions/tags" },
+                  "paths": { "$ref": "#/definitions/paths" },
+                  "paths-ignore": { "$ref": "#/definitions/paths" },
+                  "types": { "$ref": "#/definitions/types" },
+                  "schedule": { "type": "array", "items": { "type": "object", "properties": { "cron": { "type": "string" } }, "required": ["cron"] } }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables available to all jobs and steps",
+      "additionalProperties": { "type": "string" }
+    },
+    "permissions": {
+      "description": "Job-level permissions for the GITHUB_TOKEN",
+      "oneOf": [
+        { "type": "string", "enum": ["read-all", "write-all"] },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["read", "write", "none"]
+          }
+        }
+      ]
+    },
+    "concurrency": {
+      "type": "object",
+      "properties": {
+        "group": { "type": ["string", "null"] },
+        "cancel-in-progress": { "type": "boolean" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "type": "object",
+          "properties": {
+            "shell": { "type": "string", "enum": ["bash","pwsh","python","sh","cmd","powershell"] },
+            "working-directory": { "type": "string" }
+          }
+        }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "description": "A map of job IDs to job definitions",
+      "propertyNames": {
+        "pattern": "^[a-zA-Z_][a-zA-Z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["runs-on"],
+        "properties": {
+          "name": { "type": "string" },
+          "runs-on": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "needs": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "if": { "type": "string" },
+          "permissions": {
+            "oneOf": [
+              { "type": "string", "enum": ["read-all", "write-all"] },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": ["read", "write", "none"]
+                }
+              }
+            ]
+          },
+          "concurrency": {
+            "type": "object",
+            "properties": {
+              "group": { "type": ["string", "null"] },
+              "cancel-in-progress": { "type": "boolean" }
+            }
+          },
+          "environment": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "url": { "type": ["string", "null"] }
+                },
+                "required": ["name"]
+              }
+            ]
+          },
+          "outputs": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "defaults": {
+            "type": "object",
+            "properties": {
+              "run": {
+                "type": "object",
+                "properties": {
+                  "shell": { "type": "string" },
+                  "working-directory": { "type": "string" }
+                }
+              }
+            }
+          },
+          "timeout-minutes": { "type": "number" },
+          "continue-on-error": { "type": "boolean" },
+          "strategy": {
+            "type": "object",
+            "properties": {
+              "fail-fast": { "type": "boolean" },
+              "max-parallel": { "type": "number" },
+              "matrix": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": {
+                      "oneOf": [
+                        { "type": "string" },
+                        { "type": "number" },
+                        { "type": "boolean" },
+                        { "type": "array", "items": { "type": ["string","number","boolean"] } }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "include": {
+                        "type": "array",
+                        "items": { "type": "object" }
+                      },
+                      "exclude": {
+                        "type": "array",
+                        "items": { "type": "object" }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "container": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "properties": {
+                  "image": { "type": "string" },
+                  "credentials": {
+                    "type": "object",
+                    "properties": {
+                      "username": { "type": "string" },
+                      "password": { "type": "string" }
+                    }
+                  },
+                  "env": { "type": "object", "additionalProperties": { "type": "string" } },
+                  "ports": { "type": "array", "items": { "type": "string" } },
+                  "volumes": { "type": "array", "items": { "type": "string" } },
+                  "options": { "type": "string" }
+                },
+                "required": ["image"]
+              }
+            ]
+          },
+          "services": {
+            "type": "object",
+            "additionalProperties": {
+              "oneOf": [
+                { "type": "string" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "image": { "type": "string" },
+                    "credentials": {
+                      "type": "object",
+                      "properties": {
+                        "username": { "type": "string" },
+                        "password": { "type": "string" }
+                      }
+                    },
+                    "env": { "type": "object", "additionalProperties": { "type": "string" } },
+                    "ports": { "type": "array", "items": { "type": "string" } },
+                    "options": { "type": "string" }
+                  },
+                  "required": ["image"]
+                }
+              ]
+            }
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "minProperties": 1,
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": ["string", "null"] },
+                "uses": { "type": "string" },
+                "run": { "type": "string" },
+                "shell": { "type": "string" },
+                "working-directory": { "type": "string" },
+                "if": { "type": "string" },
+                "env": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                },
+                "with": {
+                  "type": "object",
+                  "additionalProperties": { "type": ["string", "number", "boolean"] }
+                },
+                "continue-on-error": { "type": "boolean" },
+                "timeout-minutes": { "type": "number" }
+              }
+            }
+          },
+          "uses": { "type": "string" },
+          "with": {
+            "type": "object",
+            "additionalProperties": { "type": ["string", "number", "boolean"] }
+          },
+          "secrets": {
+            "oneOf": [
+              { "type": "string", "enum": ["inherit"] },
+              { "type": "object" }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "branches": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "tags": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "paths": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    },
+    "types": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ]
+    }
+  }
+}

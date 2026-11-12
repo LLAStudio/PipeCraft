@@ -1,0 +1,42 @@
+id: dev.pipecraft.PipeCraft
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+base: org.electronjs.Electron2.BaseApp
+base-version: "25.08"
+command: pipecraft
+separate-locales: false
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=xdg-download
+  - --filesystem=xdg-documents
+  - --env=XCURSOR_PATH=/run/host/user-share/icons:/run/host/share/icons
+
+modules:
+  - name: pipecraft
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/pipecraft
+      - cp -a . /app/pipecraft
+      - install -Dm755 pipecraft.sh /app/bin/pipecraft
+      - install -Dm644 dev.pipecraft.PipeCraft.desktop /app/share/applications/dev.pipecraft.PipeCraft.desktop
+      - install -Dm644 icon-512.png /app/share/icons/hicolor/512x512/apps/dev.pipecraft.PipeCraft.png
+      - install -Dm644 icon.png /app/share/icons/hicolor/1024x1024/apps/dev.pipecraft.PipeCraft.png
+    sources:
+      - type: dir
+        path: release/linux-unpacked
+      - type: file
+        path: flatpak/pipecraft.sh
+      - type: file
+        path: flatpak/dev.pipecraft.PipeCraft.desktop
+      - type: file
+        path: build/icon.png
+        dest-filename: icon.png
+      - type: file
+        path: build/icon-512.png
+        dest-filename: icon-512.png

@@ -1,0 +1,73 @@
+appId: dev.pipecraft.PipeCraft
+productName: PipeCraft
+copyright: Copyright © 2026 PipeCraft
+artifactName: PipeCraft-${version}-${os}-${arch}.${ext}
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - electron/**/*
+  - build/icon.png
+  - package.json
+
+extraResources:
+  - from: .next/standalone
+    to: standalone
+
+asar: true
+compression: normal
+npmRebuild: false
+nodeGypRebuild: false
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.png
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: PipeCraft
+  uninstallDisplayName: PipeCraft
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  icon: build/icon.png
+  category: public.app-category.developer-tools
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: dir
+      arch:
+        - x64
+  icon: build/icon.png
+  category: Development
+  executableName: pipecraft
+  syncDesktopName: true
+  maintainer: PipeCraft
+  vendor: PipeCraft
+  synopsis: Visual CI/CD pipeline editor
+  description: Build and edit GitHub Actions workflows on a visual canvas.

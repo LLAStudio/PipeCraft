@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=PipeCraft
+Comment=Visual CI/CD pipeline editor
+Exec=pipecraft %U
+Icon=dev.pipecraft.PipeCraft
+Terminal=false
+Type=Application
+Categories=Development;
+Keywords=CI;CD;GitHub;Actions;YAML;Pipeline;
+StartupWMClass=dev.pipecraft.PipeCraft
