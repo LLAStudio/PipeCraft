@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question
+    url: https://github.com/lemonlimeacid/PipeCraft/discussions
+    about: Need help, have a usage question or want to share a workflow? Use Discussions instead of opening an issue.
+  - name: Documentation
+    url: https://github.com/lemonlimeacid/PipeCraft#readme
+    about: Installation, build instructions and feature overview live in the README.
