@@ -12,9 +12,13 @@ files:
   - build/icon.png
   - package.json
 
+# electron-builder drops a node_modules directory that sits at the root of a
+# copied source, so the standalone runtime dependencies are added separately.
 extraResources:
   - from: .next/standalone
     to: standalone
+  - from: .next/standalone/node_modules
+    to: standalone/node_modules
 
 asar: true
 compression: normal

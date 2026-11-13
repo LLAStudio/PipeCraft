@@ -16,11 +16,11 @@ Grab the latest desktop build from the [**Releases**](https://github.com/lemonli
 
 | Platform | Asset |
 | --- | --- |
-| Windows (x64) | `PipeCraft-1.0.0-win-x64.exe` |
-| macOS (Intel) | `PipeCraft-1.0.0-mac-x64.dmg` / `.zip` |
-| macOS (Apple Silicon) | `PipeCraft-1.0.0-mac-arm64.dmg` / `.zip` |
-| Linux (x64) | `PipeCraft-1.0.0-linux-x86_64.AppImage` |
-| Linux (Flatpak) | `PipeCraft-1.0.0-x86_64.flatpak` |
+| Windows (x64) | `PipeCraft-1.0.1-win-x64.exe` |
+| macOS (Intel) | `PipeCraft-1.0.1-mac-x64.dmg` / `.zip` |
+| macOS (Apple Silicon) | `PipeCraft-1.0.1-mac-arm64.dmg` / `.zip` |
+| Linux (x64) | `PipeCraft-1.0.1-linux-x86_64.AppImage` |
+| Linux (Flatpak) | `PipeCraft-1.0.1-x86_64.flatpak` |
 
 The desktop builds are **not code-signed**:
 - **macOS** — right-click the app → *Open*, or run `xattr -dr com.apple.quarantine /Applications/PipeCraft.app`.
@@ -115,8 +115,8 @@ Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/rele
 3. Publishes every artifact to a GitHub Release.
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
 ## Project structure
