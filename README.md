@@ -136,4 +136,4 @@ flatpak/            Desktop entry and launcher for the Flatpak build
 
 ## License
 
-No license file is included yet. Until one is added, the code is “all rights reserved” by default — open an issue if you need clarification on reuse.
+Released under the [MIT License](LICENSE). You are free to use, modify and distribute PipeCraft, including commercially, provided the copyright notice and permission notice are included in copies or substantial portions of the software.
