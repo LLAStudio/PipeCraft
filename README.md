@@ -1,5 +1,8 @@
 # PipeCraft
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-lime.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/lemonlimeacid/PipeCraft?label=release&color=lime)](https://github.com/lemonlimeacid/PipeCraft/releases/latest)
+
 **A visual CI/CD pipeline editor for GitHub Actions.** Build workflows on a canvas, get clean YAML out, and validate pipelines before they ever reach your repository.
 
 Write pipelines by connecting nodes — triggers, jobs, steps, reusable workflows — instead of hand-editing YAML. PipeCraft keeps the graph and the YAML in sync in both directions, so you can start visually and finish in code (or the other way around).
