@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, shell } = require("electron");
 const { spawn } = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
@@ -8,17 +9,33 @@ const path = require("node:path");
 const isMac = process.platform === "darwin";
 const APP_ID = "dev.pipecraft.PipeCraft";
 const DEFAULT_PORT = 47821;
+const MAX_PORT_ATTEMPTS = 20;
+const MAX_RESTARTS = 2;
 
 let mainWindow = null;
 let serverProcess = null;
 let serverPort = Number(process.env.PIPECRAFT_DESKTOP_PORT || DEFAULT_PORT);
 let serverLog = null;
 let isQuitting = false;
+let restartCount = 0;
+let restartTimer = null;
 
 function getServerDirectory() {
   return app.isPackaged
     ? path.join(process.resourcesPath, "standalone")
     : path.join(__dirname, "..", ".next", "standalone");
+}
+
+function getDataDirectory() {
+  return app.getPath("userData");
+}
+
+function getEnvFilePath() {
+  return path.join(getDataDirectory(), "pipecraft.env");
+}
+
+function getLogFilePath() {
+  return path.join(getDataDirectory(), "server.log");
 }
 
 function isPortAvailable(port) {
@@ -30,8 +47,20 @@ function isPortAvailable(port) {
   });
 }
 
+async function findAvailablePort(startPort) {
+  for (let offset = 0; offset < MAX_PORT_ATTEMPTS; offset += 1) {
+    const candidate = startPort + offset;
+    if (candidate > 65535) break;
+    // eslint-disable-next-line no-await-in-loop
+    if (await isPortAvailable(candidate)) return candidate;
+  }
+  throw new Error(
+    `No free port found between ${startPort} and ${startPort + MAX_PORT_ATTEMPTS - 1}. Close other PipeCraft instances or set PIPECRAFT_DESKTOP_PORT to a free port.`,
+  );
+}
+
 function readUserEnvironment() {
-  const file = path.join(app.getPath("userData"), "pipecraft.env");
+  const file = getEnvFilePath();
   const values = {};
   if (!fs.existsSync(file)) return values;
 
@@ -54,6 +83,58 @@ function readUserEnvironment() {
   return values;
 }
 
+function generateSecret(bytes) {
+  return crypto.randomBytes(bytes).toString("hex");
+}
+
+/**
+ * Creates the user configuration file on first launch and makes sure the two
+ * required secrets exist. Without them NextAuth fails every session request and
+ * token encryption throws, which used to leave the app in a broken state.
+ */
+function ensureUserEnvironment() {
+  const file = getEnvFilePath();
+  fs.mkdirSync(getDataDirectory(), { recursive: true });
+
+  if (!fs.existsSync(file)) {
+    const content = [
+      "# PipeCraft desktop configuration",
+      "#",
+      "# Generated secrets are created on first launch. Keep this file private.",
+      `AUTH_SECRET=${crypto.randomBytes(32).toString("base64url")}`,
+      `ENCRYPTION_MASTER_KEY=${generateSecret(32)}`,
+      "",
+      "# Optional: PostgreSQL connection string used for projects, templates and accounts.",
+      "# DATABASE_URL=postgresql://user:password@localhost:5432/pipecraft",
+      "",
+      "# Optional: GitHub OAuth app credentials used to sign in with GitHub.",
+      "# GITHUB_CLIENT_ID=",
+      "# GITHUB_CLIENT_SECRET=",
+      "",
+      "# Optional: read-only token used to query public GitHub metadata.",
+      "# GITHUB_PUBLIC_TOKEN=",
+      "",
+    ].join("\n");
+    fs.writeFileSync(file, content, { mode: 0o600 });
+    return;
+  }
+
+  const current = fs.readFileSync(file, "utf8");
+  const additions = [];
+  if (!/^\s*AUTH_SECRET\s*=/m.test(current)) {
+    additions.push(`AUTH_SECRET=${crypto.randomBytes(32).toString("base64url")}`);
+  }
+  if (!/^\s*ENCRYPTION_MASTER_KEY\s*=/m.test(current)) {
+    additions.push(`ENCRYPTION_MASTER_KEY=${generateSecret(32)}`);
+  }
+  if (additions.length > 0) {
+    fs.appendFileSync(
+      file,
+      `\n# Added automatically by PipeCraft on ${new Date().toISOString()}\n${additions.join("\n")}\n`,
+    );
+  }
+}
+
 function checkServer(port) {
   return new Promise((resolve) => {
     const request = http.get(
@@ -71,13 +152,85 @@ function checkServer(port) {
   });
 }
 
-async function waitForServer(port) {
+async function waitForServer(port, abortSignal) {
   const deadline = Date.now() + 45000;
   while (Date.now() < deadline) {
+    if (abortSignal.reason) throw abortSignal.reason;
     if (await checkServer(port)) return;
     await new Promise((resolve) => setTimeout(resolve, 400));
   }
-  throw new Error("The local PipeCraft server did not become ready in time.");
+  throw new Error(
+    `The local PipeCraft server did not answer on port ${port} within 45 seconds.`,
+  );
+}
+
+function readLogTail(maxLines = 25) {
+  try {
+    const file = getLogFilePath();
+    if (!fs.existsSync(file)) return "";
+    const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+    return lines.slice(-maxLines).join("\n").trim();
+  } catch {
+    return "";
+  }
+}
+
+function showFailure(message, detail) {
+  const logPath = getLogFilePath();
+  const hasLog = fs.existsSync(logPath);
+  const buttons = hasLog
+    ? ["Open server log", "Open data folder", "Close"]
+    : ["Open data folder", "Close"];
+
+  const choice = dialog.showMessageBoxSync({
+    type: "error",
+    title: "PipeCraft stopped",
+    message,
+    detail: `${detail}\n\nLog file: ${logPath}`,
+    buttons,
+    defaultId: 0,
+    cancelId: buttons.length - 1,
+    noLink: true,
+  });
+
+  if (hasLog && choice === 0) void shell.openPath(logPath);
+  const folderIndex = buttons.length - 2;
+  if (choice === folderIndex) void shell.openPath(getDataDirectory());
+}
+
+function scheduleRestart(reason) {
+  if (isQuitting || restartTimer) return;
+  if (restartCount >= MAX_RESTARTS) {
+    const tail = readLogTail();
+    showFailure(
+      "The local application server keeps stopping.",
+      [
+        reason,
+        tail ? `Last lines of the server log:\n\n${tail}` : "The server log is empty.",
+      ].join("\n\n"),
+    );
+    isQuitting = true;
+    app.quit();
+    return;
+  }
+
+  restartCount += 1;
+  const delay = 1200 * restartCount;
+  serverLog?.write(
+    `\n--- Restarting the server (attempt ${restartCount}/${MAX_RESTARTS}) in ${delay} ms ---\n`,
+  );
+
+  restartTimer = setTimeout(() => {
+    restartTimer = null;
+    if (isQuitting) return;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.destroy();
+      mainWindow = null;
+    }
+    launch().catch((error) => {
+      scheduleRestart(error instanceof Error ? error.message : String(error));
+    });
+  }, delay);
 }
 
 async function startServer() {
@@ -86,28 +239,28 @@ async function startServer() {
 
   if (!fs.existsSync(serverEntry)) {
     throw new Error(
-      `The desktop server bundle is missing at ${serverEntry}. Run "bun run desktop:build" before launching the desktop app.`,
+      `The desktop server bundle is missing at ${serverEntry}. Reinstall PipeCraft, or run "bun run desktop:build" before launching from source.`,
     );
   }
 
-  if (!(await isPortAvailable(serverPort))) {
-    throw new Error(
-      `Port ${serverPort} is already in use. Close the other PipeCraft instance or set PIPECRAFT_DESKTOP_PORT to a free port.`,
-    );
-  }
-
+  ensureUserEnvironment();
+  serverPort = await findAvailablePort(serverPort);
   const localUrl = `http://127.0.0.1:${serverPort}`;
-  fs.mkdirSync(app.getPath("userData"), { recursive: true });
-  serverLog = fs.createWriteStream(path.join(app.getPath("userData"), "server.log"), {
-    flags: "a",
-  });
-  serverLog.write(`\n--- PipeCraft server start ${new Date().toISOString()} ---\n`);
 
+  fs.mkdirSync(getDataDirectory(), { recursive: true });
+  serverLog = fs.createWriteStream(getLogFilePath(), { flags: "a" });
+  serverLog.write(
+    `\n--- PipeCraft server start ${new Date().toISOString()} (port ${serverPort}) ---\n`,
+  );
+
+  const userEnvironment = readUserEnvironment();
+
+  const abortController = new AbortController();
   serverProcess = spawn(process.execPath, [serverEntry], {
     cwd: serverDirectory,
     env: {
       ...process.env,
-      ...readUserEnvironment(),
+      ...userEnvironment,
       AUTH_URL: localUrl,
       NEXTAUTH_URL: localUrl,
       AUTH_TRUST_HOST: "true",
@@ -116,29 +269,34 @@ async function startServer() {
       PORT: String(serverPort),
       NODE_ENV: "production",
       NEXT_TELEMETRY_DISABLED: "1",
+      PIPECRAFT_DATA_DIR: getDataDirectory(),
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
 
-  serverProcess.stdout.on("data", (chunk) => serverLog.write(chunk));
-  serverProcess.stderr.on("data", (chunk) => serverLog.write(chunk));
-  serverProcess.on("error", (error) => serverLog.write(`${error.stack ?? error}\n`));
+  serverProcess.stdout.on("data", (chunk) => serverLog?.write(chunk));
+  serverProcess.stderr.on("data", (chunk) => serverLog?.write(chunk));
+  serverProcess.on("error", (error) => {
+    serverLog?.write(`${error.stack ?? error}\n`);
+    abortController.abort(error);
+  });
   serverProcess.on("exit", (code, signal) => {
-    serverLog.write(`\n--- PipeCraft server exited (code=${code}, signal=${signal}) ---\n`);
-    if (!isQuitting) {
-      dialog.showErrorBox(
-        "PipeCraft stopped",
-        "The local application server stopped unexpectedly. See the server log in the PipeCraft data folder for details.",
-      );
-      app.quit();
-    }
+    serverLog?.write(`\n--- PipeCraft server exited (code=${code}, signal=${signal}) ---\n`);
+    if (isQuitting) return;
+    const reason = `The local application server exited unexpectedly (code=${code ?? "unknown"}, signal=${signal ?? "none"}).`;
+    abortController.abort(new Error(reason));
+    scheduleRestart(reason);
   });
 
-  await waitForServer(serverPort);
+  await waitForServer(serverPort, abortController.signal);
 }
 
 function stopServer() {
+  if (restartTimer) {
+    clearTimeout(restartTimer);
+    restartTimer = null;
+  }
   if (serverProcess && !serverProcess.killed) {
     serverProcess.kill("SIGTERM");
   }
@@ -207,12 +365,16 @@ function buildMenu() {
         },
         {
           label: "Open configuration folder",
-          click: () => void shell.openPath(app.getPath("userData")),
+          click: () => void shell.openPath(getDataDirectory()),
+        },
+        {
+          label: "Open configuration file",
+          click: () => void shell.openPath(getEnvFilePath()),
         },
         {
           label: "Open server log",
           click: () => {
-            const logPath = path.join(app.getPath("userData"), "server.log");
+            const logPath = getLogFilePath();
             if (fs.existsSync(logPath)) void shell.openPath(logPath);
           },
         },
@@ -229,12 +391,11 @@ async function launch() {
     buildMenu();
     createWindow();
   } catch (error) {
+    if (isQuitting) return;
     const message = error instanceof Error ? error.message : String(error);
-    if (serverLog) {
-      serverLog.write(`${message}\n`);
-    }
-    dialog.showErrorBox("PipeCraft could not start", message);
-    app.quit();
+    serverLog?.write(`${message}\n`);
+    scheduleRestart(message);
+    throw error;
   }
 }
 
@@ -258,10 +419,15 @@ if (!gotSingleInstanceLock) {
     mainWindow.focus();
   });
 
-  app.whenReady().then(launch);
+  app.whenReady().then(() =>
+    launch().catch(() => {
+      // Failures are reported and retried by scheduleRestart(); avoid an
+      // unhandled rejection that would close the app with no explanation.
+    }),
+  );
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0 && serverPort) {
+    if (BrowserWindow.getAllWindows().length === 0 && serverProcess) {
       createWindow();
     }
   });
