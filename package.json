@@ -67,5 +67,6 @@
   },
   "description": "Visual CI/CD pipeline editor for GitHub Actions.",
   "author": "PipeCraft",
+  "license": "MIT",
   "desktopName": "dev.pipecraft.PipeCraft.desktop"
 }
