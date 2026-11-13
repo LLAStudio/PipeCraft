@@ -3,6 +3,7 @@
 import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import {
   Zap,
   GitBranch,
@@ -10,11 +11,11 @@ import {
   DollarSign,
   ArrowRight,
   Play,
-  Sparkles,
   Terminal,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { parseYamlToGraph } from "@/lib/compiler/yamlToGraph";
 import { usePipelineStore } from "@/store/usePipelineStore";
 import { motion } from "framer-motion";
 import { useDropzone } from "react-dropzone";
@@ -53,14 +54,6 @@ const features = [
     bgColor: "bg-lime-500/10",
   },
   {
-    icon: <Sparkles className="w-5 h-5" />,
-    title: "Built-in AI (Cmd+K)",
-    description:
-      "Describe what you want in plain language and let AI update your graph.",
-    color: "text-yellow-400",
-    bgColor: "bg-yellow-500/10",
-  },
-  {
     icon: <Terminal className="w-5 h-5" />,
     title: "Local runs (act)",
     description:
@@ -82,6 +75,7 @@ export default function HomePage() {
   const store = usePipelineStore();
   const [isLoadingSandbox, setIsLoadingSandbox] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Open sandbox (free, no-auth editor with demo pipeline)
   const handleOpenSandbox = useCallback(async () => {
@@ -94,18 +88,48 @@ export default function HomePage() {
     router.push("/editor/sandbox");
   }, [router, store]);
 
-  // Drag and drop YAML import
-  const { getRootProps, getInputProps, isDragActive: isFileDragActive } = useDropzone({
-    onDrop: async (acceptedFiles) => {
-      for (const file of acceptedFiles) {
-        if (file.name.endsWith(".yml") || file.name.endsWith(".yaml")) {
-          const text = await file.text();
-          // Would trigger YAML import here
-          console.log("YAML import:", file.name, text.length, "bytes");
+  // Import a workflow file straight into the sandbox editor.
+  const importYamlFile = useCallback(
+    async (file: File) => {
+      setIsLoadingSandbox(true);
+      try {
+        const result = parseYamlToGraph(await file.text());
+        if (!result.success || !result.graph) {
+          setIsLoadingSandbox(false);
+          setImportError(result.error ?? "This file is not a valid GitHub Actions workflow.");
+          return;
         }
+        store.setNodes(result.graph.nodes);
+        store.setEdges(result.graph.edges);
+        store.setViewport(result.graph.viewport);
+        if (result.graph.globalSettings) store.setGlobalSettings(result.graph.globalSettings);
+        router.push("/editor/sandbox");
+      } catch {
+        setIsLoadingSandbox(false);
+        setImportError("The file could not be read.");
       }
     },
-    accept: { "text/yaml": [".yml", ".yaml"] },
+    [router, store],
+  );
+
+  // Drag and drop YAML import
+  const { getRootProps, getInputProps, isDragActive: isFileDragActive } = useDropzone({
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles.find(
+        (candidate) => candidate.name.endsWith(".yml") || candidate.name.endsWith(".yaml"),
+      );
+      if (!file) {
+        setImportError("Drop a .yml or .yaml workflow file.");
+        return;
+      }
+      setImportError(null);
+      void importYamlFile(file);
+    },
+    accept: {
+      "text/yaml": [".yml", ".yaml"],
+      "application/yaml": [".yml", ".yaml"],
+      "text/plain": [".yml", ".yaml"],
+    },
     onDragEnter: () => setDragActive(true),
     onDragLeave: () => setDragActive(false),
     onDragOver: () => setDragActive(true),
@@ -269,7 +293,7 @@ export default function HomePage() {
                   <>
                     <Import className="w-8 h-8 text-gray-500" />
                     <p className="text-sm text-gray-400">
-                      or paste / import an existing YAML file
+                      or import an existing YAML file
                     </p>
                     <p className="text-xs text-gray-500">
                       Automatic two-way sync
@@ -277,6 +301,9 @@ export default function HomePage() {
                   </>
                 )}
               </div>
+              {importError && (
+                <p className="mt-3 text-center text-xs text-red-400">{importError}</p>
+              )}
             </div>
           </motion.div>
         </div>
@@ -351,7 +378,7 @@ export default function HomePage() {
               {/* Sidebar */}
               <div className="w-48 bg-[#131610] border-r border-[#2A3022] p-3 space-y-2">
                 <div className="text-[10px] text-gray-500 font-medium uppercase tracking-wider mb-2">
-                  Blocs
+                  Blocks
                 </div>
                 {[
                   { label: "Trigger", color: "#FACC15" },
@@ -598,15 +625,15 @@ export default function HomePage() {
               open pull requests and watch runs live.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Link
-                href="/auth/signin"
+              <button
+                onClick={() => signIn("github", { callbackUrl: "/projects" })}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-lime-400 text-[#0E1207] hover:bg-lime-300 text-sm font-medium transition-colors"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12C24 5.37 18.63 0 12 0Z" />
                 </svg>
                 Continue with GitHub
-              </Link>
+              </button>
               <button
                 onClick={handleOpenSandbox}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#1D2117] text-gray-200 border border-[#2A3022] hover:bg-[#2A3022] hover:text-white text-sm font-medium transition-colors"
@@ -648,7 +675,7 @@ export default function HomePage() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <span>© 2024 PipeCraft</span>
+            <span>© {new Date().getFullYear()} PipeCraft</span>
             <a
               href="/templates"
               className="hover:text-gray-300 transition-colors"

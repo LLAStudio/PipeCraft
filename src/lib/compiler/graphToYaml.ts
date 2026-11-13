@@ -276,11 +276,31 @@ function globalSection(settings: WorkflowGlobalSettings | undefined): YamlObject
       ? settings.permissions
       : compact({ ...(settings.permissions ?? {}) });
 
+  // GitHub expects kebab-case keys, while the internal model is camelCase.
+  const concurrency =
+    typeof settings.concurrency === "string"
+      ? settings.concurrency
+      : settings.concurrency
+        ? compact({
+            group: settings.concurrency.group,
+            "cancel-in-progress": settings.concurrency.cancelInProgress,
+          })
+        : undefined;
+
+  const defaults = settings.defaults
+    ? compact({
+        run: compact({
+          shell: settings.defaults.run?.shell,
+          "working-directory": settings.defaults.run?.workingDirectory,
+        }),
+      })
+    : undefined;
+
   return compact({
     permissions,
     env: settings.env,
-    concurrency: settings.concurrency,
-    defaults: settings.defaults,
+    concurrency,
+    defaults,
   });
 }
 

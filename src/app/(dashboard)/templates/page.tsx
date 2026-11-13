@@ -41,7 +41,7 @@ export default function TemplatesPage() {
           <div className="flex items-center gap-2 mb-1">
             <GitBranch className="w-5 h-5 text-lime-400" />
             <h1 className="text-2xl font-bold text-white tracking-tight">
-              Galerie de Templates
+              Template gallery
             </h1>
           </div>
           <p className="text-sm text-gray-500">
@@ -166,7 +166,7 @@ export default function TemplatesPage() {
                   </span>
                   <span className="flex items-center gap-0.5 ml-auto">
                     <Download className="w-3 h-3" />
-                    Utilisation: 0
+                    0 uses
                   </span>
                 </div>
 

@@ -358,7 +358,7 @@ export default function NodePaletteSidebar({
           )}
         >
           <Layers className="w-4 h-4" />
-          Blocs
+          Blocks
           {activeTab === "blocks" && (
             <motion.div
               layoutId="palette-tab-indicator"

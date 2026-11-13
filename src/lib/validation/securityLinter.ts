@@ -141,7 +141,7 @@ function checkUnpinnedActions(nodes: GraphNode[], alerts: SecurityAlert[]): void
     const job = node.data.job;
     if (!job) continue;
 
-    for (let stepIndex = 0; stepIndex < job.steps.length; stepIndex++) {
+    for (let stepIndex = 0; stepIndex < (job.steps?.length ?? 0); stepIndex++) {
       const step = job.steps[stepIndex];
       if (!step) continue;
       if (step.type !== "action" || !step.uses) continue;
@@ -231,7 +231,7 @@ function checkScriptInjection(nodes: GraphNode[], alerts: SecurityAlert[]): void
     const job = node.data.job;
     if (!job) continue;
 
-    for (let stepIndex = 0; stepIndex < job.steps.length; stepIndex++) {
+    for (let stepIndex = 0; stepIndex < (job.steps?.length ?? 0); stepIndex++) {
       const step = job.steps[stepIndex];
       if (!step) continue;
       if (step.type !== "run" || !step.run) continue;
@@ -290,12 +290,12 @@ function checkHardcodedSecrets(nodes: GraphNode[], alerts: SecurityAlert[]): voi
     if (!job) continue;
 
     // Check job-level env
-    for (const [key, value] of Object.entries(job.env)) {
+    for (const [key, value] of Object.entries(job.env ?? {})) {
       checkSecretValue(value, `Job "${job.name}" → env.${key}`, node.id, -1, alerts, seenSecrets);
     }
 
     // Check step-level values
-    for (let stepIndex = 0; stepIndex < job.steps.length; stepIndex++) {
+    for (let stepIndex = 0; stepIndex < (job.steps?.length ?? 0); stepIndex++) {
       const step = job.steps[stepIndex];
       if (!step) continue;
 
