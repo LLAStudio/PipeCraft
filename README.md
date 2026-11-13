@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-lime.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/lemonlimeacid/PipeCraft?label=release&color=lime)](https://github.com/lemonlimeacid/PipeCraft/releases/latest)
+[![Desktop release](https://github.com/lemonlimeacid/PipeCraft/actions/workflows/release.yml/badge.svg?event=push)](https://github.com/lemonlimeacid/PipeCraft/actions/workflows/release.yml)
 
 **A visual CI/CD pipeline editor for GitHub Actions.** Build workflows on a canvas, get clean YAML out, and validate pipelines before they ever reach your repository.
 
