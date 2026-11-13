@@ -1,134 +1,130 @@
 # PipeCraft
 
-PipeCraft is a visual CI/CD pipeline editor for **GitHub Actions**. Build and edit workflows with connected nodes on a canvas, keep YAML in sync in both directions, and validate pipelines before pushing them to GitHub.
+**A visual CI/CD pipeline editor for GitHub Actions.** Build workflows on a canvas, get clean YAML out, and validate pipelines before they ever reach your repository.
 
-> **Cost note:** PipeCraft displays a *GitHub Actions runner billing estimate* (based on runner type and estimated minutes/matrices). This is an estimate of **GitHub’s** hypothetical billing — **PipeCraft itself is free** and does not charge for usage.
+Write pipelines by connecting nodes — triggers, jobs, steps, reusable workflows — instead of hand-editing YAML. PipeCraft keeps the graph and the YAML in sync in both directions, so you can start visually and finish in code (or the other way around).
+
+![PipeCraft editor](screenshots/editor-final.png)
+
+## Download
+
+Grab the latest desktop build from the [**Releases**](https://github.com/lemonlimeacid/PipeCraft/releases/latest) page:
+
+| Platform | Asset |
+| --- | --- |
+| Windows (x64) | `PipeCraft-1.0.0-win-x64.exe` |
+| macOS (Intel) | `PipeCraft-1.0.0-mac-x64.dmg` / `.zip` |
+| macOS (Apple Silicon) | `PipeCraft-1.0.0-mac-arm64.dmg` / `.zip` |
+| Linux (x64) | `PipeCraft-1.0.0-linux-x86_64.AppImage` |
+| Linux (Flatpak) | `PipeCraft-1.0.0-x86_64.flatpak` |
+
+The desktop builds are **not code-signed**:
+- **macOS** — right-click the app → *Open*, or run `xattr -dr com.apple.quarantine /Applications/PipeCraft.app`.
+- **Windows** — SmartScreen will warn about an unknown publisher; choose *More info → Run anyway*.
+- **Linux AppImage** — `chmod +x PipeCraft-*.AppImage && ./PipeCraft-*.AppImage`.
 
 ## Features
 
-- **Visual no-code editor** — Design CI/CD pipelines with connected nodes (triggers, jobs, steps, reusable workflows) without writing YAML by hand.
-- **Two-way YAML sync** — Canvas changes generate clean YAML, and pasted/imported YAML updates the graph in real time.
-- **DevSecOps checks** — Automated validation/linting to help catch issues such as script injection risks, unpinned actions, excessive permissions, and plaintext secrets.
-- **GitHub runner cost estimate (FinOps)** — Live estimate of GitHub Actions runner billing (e.g. Linux 1×, Windows 2×, macOS 10×), including matrix runs. Shown as an estimate for GitHub billing only.
-- **Built-in AI (Cmd+K)** — Describe changes in plain language to update the pipeline graph.
-- **Local runs with `act`** — Generate commands for [nektos/act](https://github.com/nektos/act) to test workflows locally without pushing to GitHub.
-- **Templates & projects** — Start from built-in templates and manage pipeline projects.
+- **Visual editor** — Design pipelines with connected nodes: triggers, jobs, steps and reusable workflows. No YAML required.
+- **Two-way YAML sync** — Every canvas change produces clean GitHub Actions YAML; paste or import YAML and the graph updates instantly.
+- **Validation & DevSecOps checks** — Catches script injection patterns, unpinned actions, excessive permissions and plaintext secrets before you push.
+- **GitHub runner cost estimate** — Estimates GitHub Actions runner billing from runner type, estimated minutes and matrix expansion (Linux 1×, Windows 2×, macOS 10×).
+- **AI assistant (`Cmd/Ctrl + K`)** — Describe the change you want in plain language and let it update the graph.
+- **Local runs with `act`** — Generates the [nektos/act](https://github.com/nektos/act) command to test a workflow locally.
+- **Templates & projects** — Start from built-in templates, save and reopen your own pipelines.
+
+> **Cost estimates are GitHub's, not PipeCraft's.** The FinOps panel estimates what GitHub *would* bill for the runners a workflow uses. It is an approximation based on public runner pricing and multipliers. **PipeCraft itself is free** and never charges for usage.
+
+## Screenshots
+
+| Editor | Templates |
+| --- | --- |
+| ![Editor](screenshots/editor-drawer.png) | ![Templates](screenshots/templates-2.png) |
 
 ## Tech stack
 
-- **Framework:** [Next.js](https://nextjs.org/) (App Router) + React + TypeScript
-- **Canvas/editor:** [React Flow (@xyflow/react)](https://reactflow.dev/), Monaco Editor
-- **State:** Zustand (+ Immer/Zundo)
-- **Validation/YAML:** YAML tooling, AJV/schema validation
-- **Auth & data:** NextAuth, Prisma
-- **Desktop:** Electron + electron-builder (Windows/macOS/Linux) and Flatpak packaging support
+- **App** — Next.js (App Router), React, TypeScript
+- **Canvas** — [React Flow (`@xyflow/react`)](https://reactflow.dev/) with [dagre](https://github.com/dagrejs/dagre) auto-layout
+- **Editor** — Monaco + `monaco-yaml`
+- **State** — Zustand, Immer, Zundo (undo/redo)
+- **Validation** — AJV + a GitHub Actions workflow JSON schema
+- **Data & auth** — Prisma, NextAuth
+- **Desktop** — Electron + electron-builder (NSIS, DMG/ZIP, AppImage) and a Flatpak manifest
 
-## Getting started (web)
+## Development
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (see project requirements) or [Bun](https://bun.sh/)
-- A package manager (npm, pnpm, yarn, or bun)
+- [Bun](https://bun.sh/) (recommended, a `bun.lock` is committed) or Node.js 20+
+- A PostgreSQL database if you want projects/auth persistence
 
-### Install
+### Setup
 
 ```bash
-# with bun (recommended if you use the existing lockfile)
 bun install
-
-# or with npm
-npm install
-```
-
-### Database (Prisma)
-
-If the app requires a database for projects/auth features, configure your environment and run:
-
-```bash
+cp .env.example .env   # if present, then fill in the values
 bun run db:generate
 bun run db:push
-# optional
-bun run db:seed
-```
-
-> Configure required environment variables (e.g. database URL, auth secrets, GitHub OAuth/keys if used) in a local `.env` file as needed by your setup. Do not commit secrets.
-
-### Run in development
-
-```bash
 bun run dev
-# or
-npm run dev
 ```
 
-Then open the local URL shown in the terminal (typically `http://localhost:3000`).
+The app runs on `http://localhost:3000`. `/editor/sandbox` opens a free, no-auth editor with a demo pipeline.
 
-### Production build (web)
+### Useful scripts
 
-```bash
-bun run build
-bun run start
-```
+| Command | Description |
+| --- | --- |
+| `bun run dev` | Next.js dev server (Turbopack) |
+| `bun run build` | Production build |
+| `bun run start` | Serve the production build |
+| `bun run db:generate` / `db:push` | Prisma client / schema sync |
+| `bun run db:studio` | Prisma Studio |
+| `bun run desktop:build` | Build the standalone server bundle for Electron |
+| `bun run desktop:run` | Build and launch the desktop app |
+| `bun run dist:win` / `dist:mac` / `dist:linux` | Package installers with electron-builder |
 
-## Desktop app (Electron)
+## Desktop packaging
 
-PipeCraft can be packaged as a desktop application that runs a local Next.js server and opens it in an Electron window.
+The Electron shell (`electron/main.cjs`) starts the bundled Next.js standalone server on a local port and opens it in a native window. Packaging is configured in `electron-builder.yml`:
 
-### Build & run locally
+- **Windows** — NSIS installer (x64)
+- **macOS** — DMG + ZIP (x64 and arm64)
+- **Linux** — AppImage (x64) plus an unpacked directory used for the Flatpak
 
-```bash
-bun run desktop:run
-```
-
-This generates Prisma client, builds Next.js, prepares the desktop bundle, and launches Electron.
-
-### Create distributables
-
-```bash
-# Windows (NSIS installer, when built on a compatible environment)
-bun run dist:win
-
-# macOS (DMG/ZIP)
-bun run dist:mac
-
-# Linux (AppImage, etc.)
-bun run dist:linux
-```
-
-Packaging configuration lives in [`electron-builder.yml`](electron-builder.yml) and the Electron entrypoint is [`electron/main.cjs`](electron/main.cjs).
-
-## Flatpak
-
-A Flatpak manifest is provided at [`dev.pipecraft.PipeCraft.yml`](dev.pipecraft.PipeCraft.yml). Building Flatpak packages requires `flatpak`/`flatpak-builder` and the appropriate runtimes/SDKs in your environment or CI.
+Flatpak is built from `dev.pipecraft.PipeCraft.yml`, which packages the `linux-unpacked` directory on top of `org.electronjs.Electron2.BaseApp` (25.08).
 
 ## Releases
 
-A GitHub Actions workflow at [`.github/workflows/release.yml`](.github/workflows/release.yml) is configured to build and publish release artifacts when a version tag (e.g. `v1.0.0`) is pushed.
+Pushing a `v*` tag runs [`.github/workflows/release.yml`](.github/workflows/release.yml), which:
 
-Typical release flow:
+1. Builds the desktop server bundle on Windows, macOS and Linux.
+2. Packages the installer/archives, the AppImage and the Flatpak bundle.
+3. Publishes every artifact to a GitHub Release.
 
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-Artifacts may include Windows installer/executable, macOS app archives, Linux AppImage, and Flatpak outputs depending on the workflow configuration.
+## Project structure
 
-## Project structure (overview)
-
-- `src/app/` — Next.js routes (landing, dashboard/editor/projects/templates, API routes)
-- `src/components/` — Canvas, inspector forms, editor panels, modals
-- `src/lib/` — Compiler (graph/YAML), validation, security linting, FinOps calculator, GitHub/project utilities
-- `src/store/` — Pipeline/editor state
-- `electron/` — Electron main process
-- `prisma/` — Database schema
-- `scripts/` — Build/preparation scripts (including desktop packaging helpers)
+```
+src/app/            Next.js routes (landing, dashboard, editor, API)
+src/components/     Canvas, nodes/edges, inspector forms, panels, modals
+src/lib/            Graph ↔ YAML compiler, validation, security linting, FinOps
+src/store/          Pipeline state (Zustand + undo/redo)
+electron/           Electron main process
+prisma/             Database schema
+scripts/            Build helpers (desktop bundle preparation)
+flatpak/            Desktop entry and launcher for the Flatpak build
+```
 
 ## Notes
 
-- GitHub Actions minutes/costs shown in the app are **estimates of GitHub runner billing only** and may differ from actual billed amounts.
-- PipeCraft is not affiliated with GitHub; GitHub Actions is a product of GitHub/Microsoft.
+- PipeCraft is an independent project and is not affiliated with GitHub or Microsoft.
+- Runner cost figures are estimates and can differ from what GitHub actually bills.
+- The desktop binaries are unsigned; see the download notes above.
 
 ## License
 
-No license file is included in this repository at the moment. If you plan to distribute PipeCraft, consider adding an appropriate `LICENSE` file.
+No license file is included yet. Until one is added, the code is “all rights reserved” by default — open an issue if you need clarification on reuse.
