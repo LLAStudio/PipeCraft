@@ -2,23 +2,13 @@ import React from "react";
 import { type EdgeProps, getBezierPath } from "@xyflow/react";
 import { motion } from "framer-motion";
 
-type DependencyEdgeProps = EdgeProps & {
-  id: string;
-  source: string;
-  target: string;
-} & {
-  sourceHandle?: string | null;
-  targetHandle?: string | null;
-  type?: string;
-  className?: string;
-  label?: React.ReactNode;
-  animated?: boolean;
-};
+type DependencyEdgeProps = EdgeProps & { className?: string };
 
 export default function DependencyEdge({
-  id: _id,
-  source: _source,
-  target: _target,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
   sourcePosition,
   targetPosition,
   markerEnd,
@@ -28,19 +18,14 @@ export default function DependencyEdge({
   label,
   animated,
 }: DependencyEdgeProps) {
-  const sx = (sourcePosition as any).x;
-  const sy = (sourcePosition as any).y;
-  const tx = (targetPosition as any).x;
-  const ty = (targetPosition as any).y;
-
   const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX: sx,
-    sourceY: sy,
-    targetX: tx,
-    targetY: ty,
+    sourceX,
+    sourceY,
     sourcePosition,
+    targetX,
+    targetY,
     targetPosition,
-  } as any);
+  });
 
   if (animated) {
     return (
