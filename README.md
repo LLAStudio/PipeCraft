@@ -14,6 +14,9 @@ Write pipelines by connecting nodes — triggers, jobs, steps, reusable workflow
 
 Grab the latest desktop build from the [**Releases**](https://github.com/lemonlimeacid/PipeCraft/releases/latest) page:
 
+> [!WARNING]
+> **The `1.0.0` desktop installers are broken** — they were packaged without the bundled Next.js runtime dependencies, so PipeCraft closed on launch with a "PipeCraft stopped" error. Install **`1.0.1` or newer**; the links above always point to the latest release.
+
 | Platform | Asset |
 | --- | --- |
 | Windows (x64) | `PipeCraft-1.0.1-win-x64.exe` |
