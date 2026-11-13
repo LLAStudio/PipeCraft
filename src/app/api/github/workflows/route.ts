@@ -1,122 +1,176 @@
-import { octokitClient } from "@/lib/github/octokitClient";
+import { auth } from "@/auth";
+import { getOctokitForSession } from "@/lib/github/octokitClient";
+import {
+  enforceRateLimit,
+  logServerError,
+  readJsonBody,
+  rejectCrossOrigin,
+  rejectOversizedBody,
+} from "@/lib/security/http";
+import { publishSchema, repoRefSchema } from "@/lib/security/repoInput";
 import { NextRequest, NextResponse } from "next/server";
 
+const READ_LIMIT = { limit: 60, windowMs: 60_000 };
+const WRITE_LIMIT = { limit: 20, windowMs: 60_000 };
+
+async function requireGitHub() {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) {
+    return {
+      error: NextResponse.json(
+        { error: "Not authenticated. Sign in with GitHub." },
+        { status: 401 },
+      ),
+    } as const;
+  }
+
+  const octokit = await getOctokitForSession(userId);
+  if (!octokit) {
+    return {
+      error: NextResponse.json(
+        { error: "GitHub account is not linked. Sign in again." },
+        { status: 403 },
+      ),
+    } as const;
+  }
+
+  return { octokit, userId } as const;
+}
+
 export async function GET(request: NextRequest) {
+  const limited = enforceRateLimit(request, "github:workflows:read", READ_LIMIT.limit, READ_LIMIT.windowMs);
+  if (limited) return limited;
+
+  const gh = await requireGitHub();
+  if ("error" in gh) return gh.error;
+
+  const params = request.nextUrl.searchParams;
+  const parsed = repoRefSchema.safeParse({
+    owner: params.get("owner") ?? "",
+    repo: params.get("repo") ?? "",
+    branch: params.get("branch") ?? undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid repository" },
+      { status: 400 },
+    );
+  }
+
+  const { owner, repo } = parsed.data;
+  const branch = parsed.data.branch ?? "main";
+
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const owner = searchParams.get("owner");
-    const repo = searchParams.get("repo");
-    const branch = searchParams.get("branch") ?? "main";
-
-    if (!owner || !repo) {
-      return NextResponse.json(
-        { error: "Specify owner and repo" },
-        { status: 400 },
-      );
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const octokit = octokitClient as any;
-    const { data } = await octokit.repos.getContents({
-      owner: owner!,
-      repo: repo!,
+    const { data } = await gh.octokit.repos.getContent({
+      owner,
+      repo,
       path: ".github/workflows",
       ref: branch,
     });
 
-    const workflows: Array<{
-      name: string;
-      path: string;
-      content: string;
-      sha: string;
-    }> = [];
+    if (!Array.isArray(data)) {
+      return NextResponse.json({ error: "Unexpected GitHub response" }, { status: 502 });
+    }
 
-    for (const file of data as any[]) {
-      if (file.type === "file" && (file.name.endsWith(".yml") || file.name.endsWith(".yaml"))) {
-        const content = Buffer.from(file.content, "base64").toString("utf-8");
-        workflows.push({
-          name: file.name,
-          path: file.path,
-          content,
-          sha: file.sha,
-        });
-      }
+    const workflows: Array<{ name: string; path: string; content: string; sha: string }> = [];
+
+    for (const file of data) {
+      if (file.type !== "file" || !/\.ya?ml$/.test(file.name)) continue;
+      const { data: fileData } = await gh.octokit.repos.getContent({
+        owner,
+        repo,
+        path: file.path,
+        ref: branch,
+      });
+      if (Array.isArray(fileData) || !("content" in fileData) || !fileData.content) continue;
+      workflows.push({
+        name: file.name,
+        path: file.path,
+        content: Buffer.from(fileData.content, "base64").toString("utf-8"),
+        sha: file.sha ?? fileData.sha,
+      });
     }
 
     return NextResponse.json({ workflows });
   } catch (error) {
-    console.error("[GET /api/github/workflows]", error);
-    return NextResponse.json(
-      { error: "Failed to fetch workflows" },
-      { status: 500 },
-    );
+    logServerError("GET /api/github/workflows", error);
+    return NextResponse.json({ error: "Failed to fetch workflows" }, { status: 502 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
+
+  const tooLarge = rejectOversizedBody(request, 1024 * 1024);
+  if (tooLarge) return tooLarge;
+
+  const limited = enforceRateLimit(request, "github:workflows:write", WRITE_LIMIT.limit, WRITE_LIMIT.windowMs);
+  if (limited) return limited;
+
+  const gh = await requireGitHub();
+  if ("error" in gh) return gh.error;
+
+  const body = await readJsonBody(request, 1024 * 1024);
+  if (!body.ok) return body.response;
+
+  const parsed = publishSchema.safeParse(body.data);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "Invalid workflow payload" },
+      { status: 400 },
+    );
+  }
+
+  const { owner, repo, filePath, yamlContent, commitMessage, mode, prTitle, prBody } = parsed.data;
+  const branch = parsed.data.branch ?? "main";
+
   try {
-    const body = await request.json();
-    const { owner, repo, branch, filePath, yamlContent, commitMessage, mode, prTitle, prBody } = body;
-
-    if (!owner || !repo || !filePath || !yamlContent) {
-      return NextResponse.json(
-        { error: "owner, repo, filePath and yamlContent are required" },
-        { status: 400 },
-      );
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const octokit = octokitClient as any;
-
-    if (mode === "direct_commit") {
-      await octokit.repos.createOrUpdateFileContents({
-        owner: owner,
-        repo: repo,
+    if ((mode ?? "direct_commit") === "direct_commit") {
+      await gh.octokit.repos.createOrUpdateFileContents({
+        owner,
+        repo,
         path: filePath,
         message: commitMessage || "Update workflow via PipeCraft",
-        content: Buffer.from(yamlContent).toString("base64"),
-        branch: branch || "main",
+        content: Buffer.from(yamlContent, "utf-8").toString("base64"),
+        branch,
       });
 
-      return NextResponse.json({
-        success: true,
-        message: "Workflow published directly",
-      });
+      return NextResponse.json({ success: true, message: "Workflow published directly" });
     }
 
-    // Create Pull Request
-    const timestamp = Date.now();
-    const newBranch = `pipecraft/update-${timestamp}`;
+    const newBranch = `pipecraft/update-${Date.now()}`;
 
-    await octokit.git.getRef({
+    const { data: baseRef } = await gh.octokit.git.getRef({
       owner,
       repo,
-      ref: `heads/${branch || "main"}`,
+      ref: `heads/${branch}`,
     });
 
-    await octokit.git.createRef({
+    await gh.octokit.git.createRef({
       owner,
       repo,
       ref: `refs/heads/${newBranch}`,
-      sha: `refs/heads/${branch || "main"}`,
+      sha: baseRef.object.sha,
     });
 
-    await octokit.repos.createOrUpdateFileContents({
+    await gh.octokit.repos.createOrUpdateFileContents({
       owner,
       repo,
       path: filePath,
       message: commitMessage || "Update workflow via PipeCraft",
-      content: Buffer.from(yamlContent).toString("base64"),
+      content: Buffer.from(yamlContent, "utf-8").toString("base64"),
       branch: newBranch,
     });
 
-    const { data: pullRequest } = await octokit.pulls.create({
+    const { data: pullRequest } = await gh.octokit.pulls.create({
       owner,
       repo,
       title: prTitle || "Update workflow via PipeCraft",
       body: prBody || "Workflow updated via PipeCraft visual editor",
       head: newBranch,
-      base: branch || "main",
+      base: branch,
     });
 
     return NextResponse.json({
@@ -125,10 +179,7 @@ export async function POST(request: NextRequest) {
       message: "Pull request created",
     });
   } catch (error) {
-    console.error("[POST /api/github/workflows]", error);
-    return NextResponse.json(
-      { error: "Failed to publish workflow" },
-      { status: 500 },
-    );
+    logServerError("POST /api/github/workflows", error);
+    return NextResponse.json({ error: "Failed to publish workflow" }, { status: 502 });
   }
 }

@@ -6,14 +6,27 @@ import { serializeProject } from "@/lib/projects/serialize";
 import { graphToYaml } from "@/lib/compiler/graphToYaml";
 import { validateGraphSummary } from "@/lib/validation/graphValidator";
 import { lintSecurity } from "@/lib/validation/securityLinter";
+import {
+  enforceRateLimit,
+  logServerError,
+  readJsonBody,
+  rejectCrossOrigin,
+  rejectOversizedBody,
+} from "@/lib/security/http";
+import { WORKFLOW_PATH_PATTERN } from "@/lib/security/repoInput";
 import type { GraphNode, ReactFlowEdge, SerializedGraph, WorkflowGlobalSettings } from "@/types/pipeline";
+
+// The editor never needs more than a few hundred nodes; capping the arrays
+// keeps a malicious payload from forcing the server to validate/compile it.
+const MAX_NODES = 2000;
+const MAX_EDGES = 4000;
 
 const saveProjectSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  filePath: z.string().trim().min(1).max(300).optional(),
+  filePath: z.string().trim().min(1).max(300).regex(WORKFLOW_PATH_PATTERN).optional(),
   graphJson: z.object({
-    nodes: z.array(z.record(z.string(), z.unknown())),
-    edges: z.array(z.record(z.string(), z.unknown())),
+    nodes: z.array(z.record(z.string(), z.unknown())).max(MAX_NODES),
+    edges: z.array(z.record(z.string(), z.unknown())).max(MAX_EDGES),
     globalSettings: z.record(z.string(), z.unknown()).optional(),
     viewport: z
       .object({ x: z.number(), y: z.number(), zoom: z.number() })
@@ -30,7 +43,10 @@ async function requireUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(request: Request, { params }: RouteContext) {
+  const limited = enforceRateLimit(request, "project:read", 120, 60_000);
+  if (limited) return limited;
+
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
@@ -52,25 +68,30 @@ export async function GET(_request: Request, { params }: RouteContext) {
       },
     });
   } catch (error) {
-    console.error("[GET /api/projects/:id]", error);
+    logServerError("GET /api/projects/:id", error);
     return NextResponse.json({ error: "Failed to load project" }, { status: 500 });
   }
 }
 
 export async function PATCH(request: Request, { params }: RouteContext) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
+
+  const tooLarge = rejectOversizedBody(request, 3 * 1024 * 1024);
+  if (tooLarge) return tooLarge;
+
+  const limited = enforceRateLimit(request, "project:save", 60, 60_000);
+  if (limited) return limited;
+
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   const { projectId } = await params;
 
-  let payload: unknown;
-  try {
-    payload = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const body = await readJsonBody(request, 3 * 1024 * 1024);
+  if (!body.ok) return body.response;
 
-  const parsed = saveProjectSchema.safeParse(payload);
+  const parsed = saveProjectSchema.safeParse(body.data);
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? "Invalid graph" },
@@ -123,12 +144,18 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     return NextResponse.json({ project: serializeProject(project), savedAt: new Date().toISOString() });
   } catch (error) {
-    console.error("[PATCH /api/projects/:id]", error);
+    logServerError("PATCH /api/projects/:id", error);
     return NextResponse.json({ error: "Failed to save project" }, { status: 500 });
   }
 }
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+export async function DELETE(request: Request, { params }: RouteContext) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
+
+  const limited = enforceRateLimit(request, "project:delete", 30, 60_000);
+  if (limited) return limited;
+
   const userId = await requireUserId();
   if (!userId) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
@@ -143,7 +170,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     }
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[DELETE /api/projects/:id]", error);
+    logServerError("DELETE /api/projects/:id", error);
     return NextResponse.json({ error: "Failed to delete project" }, { status: 500 });
   }
 }

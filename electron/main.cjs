@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, shell, session } = require("electron");
 const { spawn } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
@@ -14,7 +14,15 @@ const MAX_RESTARTS = 2;
 
 let mainWindow = null;
 let serverProcess = null;
-let serverPort = Number(process.env.PIPECRAFT_DESKTOP_PORT || DEFAULT_PORT);
+const configuredPort = Number(process.env.PIPECRAFT_DESKTOP_PORT || DEFAULT_PORT);
+let serverPort =
+  Number.isInteger(configuredPort) && configuredPort >= 1024 && configuredPort <= 65535
+    ? configuredPort
+    : DEFAULT_PORT;
+
+// Permissions the renderer is allowed to request. Everything else (camera,
+// microphone, notifications, geolocation, ...) is denied.
+const ALLOWED_PERMISSIONS = new Set(["clipboard-sanitized-write"]);
 let serverLog = null;
 let isQuitting = false;
 let restartCount = 0;
@@ -133,6 +141,13 @@ function ensureUserEnvironment() {
       `\n# Added automatically by PipeCraft on ${new Date().toISOString()}\n${additions.join("\n")}\n`,
     );
   }
+
+  // Secrets live in this file; keep it readable by the current user only.
+  try {
+    fs.chmodSync(file, 0o600);
+  } catch {
+    // Best effort on platforms without POSIX permissions.
+  }
 }
 
 function checkServer(port) {
@@ -248,7 +263,12 @@ async function startServer() {
   const localUrl = `http://127.0.0.1:${serverPort}`;
 
   fs.mkdirSync(getDataDirectory(), { recursive: true });
-  serverLog = fs.createWriteStream(getLogFilePath(), { flags: "a" });
+  serverLog = fs.createWriteStream(getLogFilePath(), { flags: "a", mode: 0o600 });
+  try {
+    fs.chmodSync(getLogFilePath(), 0o600);
+  } catch {
+    // Best effort on platforms without POSIX permissions.
+  }
   serverLog.write(
     `\n--- PipeCraft server start ${new Date().toISOString()} (port ${serverPort}) ---\n`,
   );
@@ -307,6 +327,19 @@ function stopServer() {
   }
 }
 
+function isLocalServerUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      parsed.hostname === "127.0.0.1" &&
+      parsed.port === String(serverPort)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -320,8 +353,28 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      nodeIntegrationInWorker: false,
+      nodeIntegrationInSubFrames: false,
       sandbox: true,
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false,
+      safeDialogs: true,
     },
+  });
+
+  // Only the local PipeCraft server may ever be loaded in the app window. Any
+  // other navigation attempt opens in the user's browser instead, so a stray
+  // link (or injected markup) cannot take over the privileged window.
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (isLocalServerUrl(url)) return;
+    event.preventDefault();
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+  });
+
+  // The app does not embed <webview>; refuse any attempt to attach one.
+  mainWindow.webContents.on("will-attach-webview", (event) => {
+    event.preventDefault();
   });
 
   mainWindow.once("ready-to-show", () => {
@@ -419,12 +472,30 @@ if (!gotSingleInstanceLock) {
     mainWindow.focus();
   });
 
-  app.whenReady().then(() =>
+  app.whenReady().then(() => {
+    session.defaultSession.setPermissionRequestHandler((_contents, permission, callback) => {
+      callback(ALLOWED_PERMISSIONS.has(permission));
+    });
+    session.defaultSession.setPermissionCheckHandler((_contents, permission) =>
+      ALLOWED_PERMISSIONS.has(permission),
+    );
+
+    // Guard every webContents, including ones created by future features.
+    app.on("web-contents-created", (_event, contents) => {
+      contents.on("will-navigate", (event, url) => {
+        if (isLocalServerUrl(url)) return;
+        event.preventDefault();
+      });
+      contents.on("will-attach-webview", (event) => {
+        event.preventDefault();
+      });
+    });
+
     launch().catch(() => {
       // Failures are reported and retried by scheduleRestart(); avoid an
       // unhandled rejection that would close the app with no explanation.
-    }),
-  );
+    });
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0 && serverProcess) {
