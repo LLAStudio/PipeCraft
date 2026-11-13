@@ -62,13 +62,22 @@ The desktop builds are **not code-signed**:
 
 ```bash
 bun install
-cp .env.example .env   # if present, then fill in the values
 bun run db:generate
 bun run db:push
 bun run dev
 ```
 
-The app runs on `http://localhost:3000`. `/editor/sandbox` opens a free, no-auth editor with a demo pipeline.
+Create a `.env` file at the project root with the variables you need:
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string (Prisma) |
+| `AUTH_SECRET` | NextAuth session secret |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub OAuth app credentials (sign-in) |
+| `ENCRYPTION_MASTER_KEY` | 32-byte hex key used to encrypt stored tokens |
+| `GITHUB_PUBLIC_TOKEN` | Optional read-only token for public GitHub metadata |
+
+The app runs on `http://localhost:3000`. `/editor/sandbox` opens a free, no-auth editor with a demo pipeline, so you can try the editor without configuring auth.
 
 ### Useful scripts
 
