@@ -26,7 +26,6 @@ modules:
       - install -Dm755 pipecraft.sh /app/bin/pipecraft
       - install -Dm644 dev.pipecraft.PipeCraft.desktop /app/share/applications/dev.pipecraft.PipeCraft.desktop
       - install -Dm644 icon-512.png /app/share/icons/hicolor/512x512/apps/dev.pipecraft.PipeCraft.png
-      - install -Dm644 icon.png /app/share/icons/hicolor/1024x1024/apps/dev.pipecraft.PipeCraft.png
     sources:
       - type: dir
         path: release/linux-unpacked
@@ -34,9 +33,6 @@ modules:
         path: flatpak/pipecraft.sh
       - type: file
         path: flatpak/dev.pipecraft.PipeCraft.desktop
-      - type: file
-        path: build/icon.png
-        dest-filename: icon.png
       - type: file
         path: build/icon-512.png
         dest-filename: icon-512.png
